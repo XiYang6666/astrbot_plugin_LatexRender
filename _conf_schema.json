@@ -1,0 +1,11 @@
+{
+  "platform_filter": {
+    "description": "启用平台过滤",
+    "type": "bool",
+    "default": false
+  },
+  "allowed_platform": {
+    "description": "允许的平台",
+    "type": "list"
+  }
+}

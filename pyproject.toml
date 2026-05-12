@@ -1,0 +1,19 @@
+[project]
+name = "astrbot_plugin_LatexRender"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [{ name = "XiYang6666", email = "1782356858@qq.com" }]
+dependencies = ["matplotlib>=3.10.9"]
+requires-python = "<3.15,>=3.12"
+readme = "README.md"
+license = { text = "MIT" }
+
+[dependency-groups]
+dev = ["astrbot>=4.24.2"]
+
+
+[tool.pdm]
+distribution = false
+
+[tool.ruff.lint]
+select = ["I"]

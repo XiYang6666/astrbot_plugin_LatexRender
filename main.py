@@ -1,24 +1,87 @@
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
+import re
+from io import BytesIO
+
+import matplotlib.pyplot as plt
+from astrbot.api import AstrBotConfig, logger
+from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.message_components import Image, Plain
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
-class MyPlugin(Star):
-    def __init__(self, context: Context):
+LATEX_PATTERN = re.compile(r"\$(?!\$)(.+?)(?<!\$)\$")
+
+
+@register("astrbot_plugin_LatexRender", "XiYang6666", "渲染 LLM 输出的 Latex", "1.0.0")
+class LatexRenderPlugin(Star):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
+        self.config = config
 
-    async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+    def latex_to_image(self, formula: str):
+        fig, ax = plt.subplots(figsize=(1, 1))
+        ax.set_axis_off()
+        t = ax.text(
+            0.5,
+            0.5,
+            f"${formula}$",
+            fontsize=10,
+            ha="center",
+            va="center",
+            color="#666666",
+            transform=fig.transFigure,
+        )
 
-    # 注册指令的装饰器。指令名为 helloworld。注册成功后，发送 `/helloworld` 就会触发这个指令，并回复 `你好, {user_name}!`
-    @filter.command("helloworld")
-    async def helloworld(self, event: AstrMessageEvent):
-        """这是一个 hello world 指令""" # 这是 handler 的描述，将会被解析方便用户了解插件内容。建议填写。
-        user_name = event.get_sender_name()
-        message_str = event.message_str # 用户发的纯文本消息字符串
-        message_chain = event.get_messages() # 用户所发的消息的消息链 # from astrbot.api.message_components import *
-        logger.info(message_chain)
-        yield event.plain_result(f"Hello, {user_name}, 你发了 {message_str}!") # 发送一条纯文本消息
+        fig.canvas.draw()
+        bbox = t.get_window_extent(renderer=fig.canvas.get_renderer())
+        dpi = fig.dpi
+        pad = 2
+        w = (bbox.width + pad * 2) / dpi
+        h = (bbox.height + pad * 2) / dpi
+        fig.set_size_inches(w, h)
 
-    async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        buf = BytesIO()
+        plt.savefig(
+            buf,
+            format="png",
+            dpi=150,
+            bbox_inches="tight",
+            transparent=False,
+            facecolor="none",
+        )
+        plt.close(fig)
+
+        data = buf.getvalue()
+        return data
+
+    @filter.on_decorating_result()
+    async def on_decorating_result(self, event: AstrMessageEvent):
+        result = event.get_result()
+        if result is None:
+            return
+
+        logger.debug("current platform ->", event.platform)
+        if (
+            self.config["platform_filter"]
+            and event.platform.name not in self.config["allowed_platform"]
+        ):
+            return
+        chain = result.chain
+        new_chain = []
+
+        for seg in chain:
+            if not isinstance(seg, Plain):
+                new_chain.append(seg)
+                continue
+            text = seg.text
+            parts = re.split(LATEX_PATTERN, text)
+
+            for i, part in enumerate(parts):
+                if i % 2 == 0 and part:
+                    new_chain.append(Plain(part))
+                elif i % 2 == 1:
+                    try:
+                        data = self.latex_to_image(part)
+                        new_chain.append(Image.fromBytes(data))
+                    except Exception as e:
+                        logger.warning(f"渲染失败: {part!r} -> {e}")
+                        new_chain.append(Plain(part))
+        result.chain = new_chain
