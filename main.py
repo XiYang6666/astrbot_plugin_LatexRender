@@ -1,13 +1,15 @@
 import re
 from io import BytesIO
+from typing import Callable
 
 import matplotlib.pyplot as plt
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.message_components import Image, Plain
+from astrbot.api.message_components import BaseMessageComponent, Image, Plain
 from astrbot.api.star import Context, Star, register
 
-LATEX_PATTERN = re.compile(r"\$(?!\$)(.+?)(?<!\$)\$")
+INLINE_LATEX_PATTERN = re.compile(r"\$(?!\$)(.+?)(?<!\$)\$")
+BLOCK_LATEX_PATTERN = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
 
 
 @register("astrbot_plugin_LatexRender", "XiYang6666", "渲染 LLM 输出的 Latex", "1.0.0")
@@ -52,6 +54,45 @@ class LatexRenderPlugin(Star):
         data = buf.getvalue()
         return data
 
+    def process_chain(
+        self,
+        chain: list[BaseMessageComponent],
+        pattern: re.Pattern,
+        operation: Callable[[str], BaseMessageComponent],
+    ) -> list[BaseMessageComponent]:
+        new_chain = []
+
+        for seg in chain:
+            if not isinstance(seg, Plain):
+                new_chain.append(seg)
+                continue
+            text = seg.text
+            parts = re.split(pattern, text)
+
+            for i, part in enumerate(parts):
+                if i % 2 == 0 and part:
+                    new_chain.append(Plain(part))
+                elif i % 2 == 1:
+                    new_chain.append(operation(part))
+
+        return new_chain
+
+    def render_inline(self, part):
+        try:
+            data = self.latex_to_image(part)
+            return Image.fromBytes(data)
+        except Exception as e:
+            logger.warning(f"渲染失败: {part!r} -> {e}")
+            return Plain(part)
+
+    def render_block(self, part):
+        try:
+            data = self.latex_to_image(part.strip())
+            return Image.fromBytes(data)
+        except Exception as e:
+            logger.warning(f"渲染失败: {part!r} -> {e}")
+            return Plain(f"$${part}$$")
+
     @filter.on_decorating_result()
     async def on_decorating_result(self, event: AstrMessageEvent):
         result = event.get_result()
@@ -66,24 +107,10 @@ class LatexRenderPlugin(Star):
             and event.platform.id not in self.config["allowed_platform"]
         ):
             return
-        chain = result.chain
-        new_chain = []
 
-        for seg in chain:
-            if not isinstance(seg, Plain):
-                new_chain.append(seg)
-                continue
-            text = seg.text
-            parts = re.split(LATEX_PATTERN, text)
-
-            for i, part in enumerate(parts):
-                if i % 2 == 0 and part:
-                    new_chain.append(Plain(part))
-                elif i % 2 == 1:
-                    try:
-                        data = self.latex_to_image(part)
-                        new_chain.append(Image.fromBytes(data))
-                    except Exception as e:
-                        logger.warning(f"渲染失败: {part!r} -> {e}")
-                        new_chain.append(Plain(part))
-        result.chain = new_chain
+        result.chain = self.process_chain(
+            result.chain, BLOCK_LATEX_PATTERN, self.render_block
+        )
+        result.chain = self.process_chain(
+            result.chain, INLINE_LATEX_PATTERN, self.render_inline
+        )
