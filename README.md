@@ -1,14 +1,14 @@
-# astrbot-plugin-helloworld
+# astrbot-plugin-LatexRender
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+渲染 LLM 输出的 Latex
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+## 目的
 
-# Supports
+在 QQ 中无法渲染 Bot 输出的 Latex, 导致难以阅读输出内容, 此插件可以将 Latex 渲染为图片方便阅读
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+## 配置
+
+| 配置项           | 描述                                                       |
+| ---------------- | ---------------------------------------------------------- |
+| platform_filter  | 是否开启平台过滤,开启后仅规定的平台启用Latex渲染           |
+| allowed_platform | 启用 Latex 渲染的平台, 应填写 astrbot 中的 `机器人名称` 项 |

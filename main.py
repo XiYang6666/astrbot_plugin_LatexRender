@@ -83,7 +83,7 @@ class LatexRenderPlugin(Star):
             return Image.fromBytes(data)
         except Exception as e:
             logger.warning(f"渲染失败: {part!r} -> {e}")
-            return Plain(part)
+            return Plain(f"${part}$")
 
     def render_block(self, part):
         try:
