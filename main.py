@@ -60,9 +60,10 @@ class LatexRenderPlugin(Star):
 
         logger.debug(f"current platform -> {event.platform}")
         logger.debug(f"raw message -> {result.chain}")
+
         if (
             self.config["platform_filter"]
-            and event.platform.name not in self.config["allowed_platform"]
+            and event.platform.id not in self.config["allowed_platform"]
         ):
             return
         chain = result.chain
